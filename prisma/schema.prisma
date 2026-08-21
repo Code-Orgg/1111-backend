@@ -1,0 +1,134 @@
+// Prisma schema — The 1111 Project
+// Run `npx prisma migrate dev --name init` locally, or `npx prisma migrate deploy` in production.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String    @id @default(cuid())
+  email           String    @unique
+  passwordHash    String
+  name            String?
+  phone           String?
+  walletBalance   Int       @default(0) // kobo
+  active          Boolean   @default(true)
+  isAdmin         Boolean   @default(false)
+  marketingOptIn  Boolean   @default(true)  // required for promo emails — every promo email includes an unsubscribe link
+  lastPromoEmailAt DateTime?
+  deletedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  resetOtp        String?   // bcrypt hash of the 6-digit code, never the raw code
+  resetOtpExpiry  DateTime?
+  orders          Order[]
+  walletTx        WalletTransaction[]
+  cart            Cart?
+}
+
+model Product {
+  id          String      @id @default(cuid())
+  slug        String      @unique // stable key for safe upsert reseeding — never changes once set
+  name        String
+  series      String?
+  size        String
+  price       Int         // kobo (NGN) — kept as the source of truth used throughout checkout/orders
+  priceUSD    Int?        // cents (USD) — authored display price, not a live FX conversion
+  description String?
+  dimensions  String?
+  medium      String?
+  year        Int?
+  imageUrl    String
+  edition     String?
+  active      Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  orderItems  OrderItem[]
+  cartItems   CartItem[]
+}
+
+// Persisted server-side so we can detect abandoned carts for reminder emails —
+// a frontend-only cart can't be seen by a scheduled job.
+model Cart {
+  id        String     @id @default(cuid())
+  user      User       @relation(fields: [userId], references: [id])
+  userId    String     @unique
+  items     CartItem[]
+  updatedAt DateTime   @updatedAt
+}
+
+model CartItem {
+  id        String  @id @default(cuid())
+  cart      Cart    @relation(fields: [cartId], references: [id])
+  cartId    String
+  product   Product @relation(fields: [productId], references: [id])
+  productId String
+  qty       Int
+}
+
+model Order {
+  id                  String        @id @default(cuid())
+  user                User          @relation(fields: [userId], references: [id])
+  userId              String
+  status              OrderStatus   @default(PENDING)
+  paymentMethod       PaymentMethod @default(PAYSTACK)
+  subtotal            Int
+  providerRef         String?       @unique
+  providerVerified    Boolean       @default(false)
+  shippingName        String
+  shippingEmail       String
+  shippingPhone       String
+  shippingStreet      String
+  shippingCity        String
+  shippingCountry     String
+  shippingPostalCode  String
+  invoiceSentAt       DateTime?
+  createdAt           DateTime      @default(now())
+  items               OrderItem[]
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  order     Order   @relation(fields: [orderId], references: [id])
+  orderId   String
+  product   Product @relation(fields: [productId], references: [id])
+  productId String
+  qty       Int
+  price     Int
+}
+
+model WalletTransaction {
+  id          String       @id @default(cuid())
+  user        User         @relation(fields: [userId], references: [id])
+  userId      String
+  type        WalletTxType
+  amount      Int
+  provider    PaymentMethod?
+  providerRef String?      @unique
+  verified    Boolean      @default(false)
+  note        String?
+  createdAt   DateTime     @default(now())
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  FAILED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  PAYSTACK
+  SQUAD
+  MONNIFY
+  WALLET
+}
+
+enum WalletTxType {
+  FUND
+  DEBIT
+  REFUND
+}
