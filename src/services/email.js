@@ -3,8 +3,8 @@ const crypto = require("crypto");
 const { generateInvoicePDF } = require("./invoice");
 
 const resend = new Resend(process.env.RESEND_API_KEY);
-const FROM = process.env.EMAIL_FROM || "The 1111 Project <orders@the1111project.com>";
-const SITE_URL = process.env.FRONTEND_URL || "https://the1111project.com";
+const FROM = process.env.EMAIL_FROM || "The 1111 Project <onboarding@resend.dev>";
+const SITE_URL = process.env.FRONTEND_URL || "https://1111-frontend-omega.vercel.app";
 
 const fmt = (kobo) => "₦" + Math.round(kobo / 100).toLocaleString("en-NG");
 
@@ -55,7 +55,7 @@ async function sendOwnerAlert(order) {
   if (!OWNER_EMAIL) return;
   await resend.emails.send({
     from: FROM,
-    to: OWNER_EMAIL,
+    to: derachizzy19@gmail.com,
     subject: `💰 New paid order — ${fmt(order.subtotal)} — #${order.id}`,
     html: `
       <div style="font-family:sans-serif;">
