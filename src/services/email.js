@@ -52,10 +52,10 @@ async function sendReceipt(order, toEmail) {
 
 async function sendOwnerAlert(order) {
   const OWNER_EMAIL = process.env.OWNER_EMAIL;
-  if (!OWNER_EMAIL) return;
+  //if (!OWNER_EMAIL) return;
   await resend.emails.send({
     from: FROM,
-    to: derachizzy19@gmail.com,
+    to: "davidic.mandate26@gmail.com",
     subject: `💰 New paid order — ${fmt(order.subtotal)} — #${order.id}`,
     html: `
       <div style="font-family:sans-serif;">
