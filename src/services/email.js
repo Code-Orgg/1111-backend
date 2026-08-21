@@ -55,7 +55,7 @@ async function sendOwnerAlert(order) {
   //if (!OWNER_EMAIL) return;
   await resend.emails.send({
     from: FROM,
-    to: "davidic.mandate26@gmail.com",
+    to: "davidic.mandate26@gmail.com", 
     subject: `💰 New paid order — ${fmt(order.subtotal)} — #${order.id}`,
     html: `
       <div style="font-family:sans-serif;">
