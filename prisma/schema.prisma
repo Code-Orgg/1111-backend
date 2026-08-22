@@ -1,0 +1,138 @@
+// Prisma schema — The 1111 Project
+// Run `npx prisma migrate dev --name init` locally, or `npx prisma migrate deploy` in production.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String    @id @default(cuid())
+  email           String    @unique
+  passwordHash    String
+  name            String?
+  phone           String?
+  walletBalance   Int       @default(0) // USD, whole dollars — see src/utils/currency.js
+  active          Boolean   @default(true)
+  isAdmin         Boolean   @default(false)
+  marketingOptIn  Boolean   @default(true)  // required for promo emails — every promo email includes an unsubscribe link
+  lastPromoEmailAt DateTime?
+  deletedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  resetOtp        String?   // bcrypt hash of the 6-digit code, never the raw code
+  resetOtpExpiry  DateTime?
+  orders          Order[]
+  walletTx        WalletTransaction[]
+  cart            Cart?
+}
+
+model Product {
+  id                String      @id @default(cuid())
+  slug              String      @unique // stable key for safe upsert reseeding — never changes once set
+  name              String                          // -> frontend `title`
+  series            String?
+  size              String                          // legacy free-text size label (e.g. "Standard — 20x28in")
+  price             Int                              // USD, whole dollars — canonical price used everywhere in-app
+  description       String?
+  dimensions        String?                          // -> frontend `dimensions` (falls back to `size` if unset)
+  medium            String?
+  year              Int?
+  imageUrl          String                           // -> frontend `image`
+  edition           String?                          // legacy free-text edition label (e.g. "04 / 1111")
+  editionSize       Int         @default(0)          // -> frontend `editionSize`
+  editionRemaining  Int         @default(0)          // -> frontend `editionRemaining`
+  arDurationSeconds Int         @default(30)          // -> frontend `arDurationSeconds`
+  active            Boolean     @default(true)
+  createdAt         DateTime    @default(now())
+  orderItems        OrderItem[]
+  cartItems         CartItem[]
+}
+
+// Persisted server-side so we can detect abandoned carts for reminder emails —
+// a frontend-only cart can't be seen by a scheduled job.
+model Cart {
+  id        String     @id @default(cuid())
+  user      User       @relation(fields: [userId], references: [id])
+  userId    String     @unique
+  items     CartItem[]
+  updatedAt DateTime   @updatedAt
+}
+
+model CartItem {
+  id        String  @id @default(cuid())
+  cart      Cart    @relation(fields: [cartId], references: [id])
+  cartId    String
+  product   Product @relation(fields: [productId], references: [id])
+  productId String
+  qty       Int
+  framing   String  @default("natural-oak") // one of src/utils/framing.js FRAMING_OPTIONS ids
+}
+
+model Order {
+  id                  String        @id @default(cuid())
+  user                User          @relation(fields: [userId], references: [id])
+  userId              String
+  status              OrderStatus   @default(PENDING)
+  paymentMethod       PaymentMethod @default(PAYSTACK)
+  subtotal            Int           // USD, whole dollars
+  providerRef         String?       @unique
+  providerVerified    Boolean       @default(false)
+  shippingName        String
+  shippingEmail       String
+  shippingPhone       String
+  shippingStreet      String
+  shippingCity        String
+  shippingCountry     String
+  shippingPostalCode  String
+  invoiceSentAt       DateTime?
+  createdAt           DateTime      @default(now())
+  items               OrderItem[]
+}
+
+model OrderItem {
+  id              String  @id @default(cuid())
+  order           Order   @relation(fields: [orderId], references: [id])
+  orderId         String
+  product         Product @relation(fields: [productId], references: [id])
+  productId       String
+  qty             Int
+  price           Int     // USD, whole dollars — unit price INCLUDING framing surcharge, snapshotted at order time
+  framing         String  @default("natural-oak") // one of src/utils/framing.js FRAMING_OPTIONS ids
+}
+
+model WalletTransaction {
+  id          String       @id @default(cuid())
+  user        User         @relation(fields: [userId], references: [id])
+  userId      String
+  type        WalletTxType
+  amount      Int          // USD, whole dollars
+  provider    PaymentMethod?
+  providerRef String?      @unique
+  verified    Boolean      @default(false)
+  note        String?
+  createdAt   DateTime     @default(now())
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  FAILED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  PAYSTACK
+  SQUAD
+  MONNIFY
+  WALLET
+}
+
+enum WalletTxType {
+  FUND
+  DEBIT
+  REFUND
+}
